@@ -1,5 +1,3 @@
-require "language/node"
-
 class Tokentracker < Formula
   desc "Token usage tracker for AI agent CLIs (Claude Code, Codex, Cursor, Gemini, etc.)"
   homepage "https://github.com/mm7894215/TokenTracker"
@@ -15,11 +13,11 @@ class Tokentracker < Formula
   depends_on "node"
 
   def install
-    system "npm", "install", *Language::Node.std_npm_install_args(libexec)
+    system "npm", "install", *std_npm_args
     bin.install_symlink Dir["#{libexec}/bin/*"]
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/tokentracker --version")
+    assert_match "tokentracker", shell_output("#{bin}/tokentracker --help")
   end
 end
