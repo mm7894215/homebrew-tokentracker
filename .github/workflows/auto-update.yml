@@ -1,0 +1,132 @@
+name: auto-update
+
+# Bumps the Cask (DMG) and Formula (npm CLI) whenever a new TokenTracker
+# release is published. Two triggers:
+#
+#   1. repository_dispatch — fired from the main TokenTracker repo's
+#      release-dmg.yml / npm-publish.yml workflows for near-realtime sync.
+#   2. schedule — hourly polling fallback, in case the dispatch is
+#      missed (e.g. cross-repo PAT expired, workflow disabled, etc.).
+#
+# Only uses the built-in GITHUB_TOKEN — no cross-repo PAT required.
+
+on:
+  repository_dispatch:
+    types: [tokentracker-release]
+  schedule:
+    - cron: "17 * * * *" # hourly at :17
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve latest versions
+        id: versions
+        run: |
+          set -euo pipefail
+
+          # Latest GitHub release tag for the DMG
+          DMG_TAG=$(curl -sSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/mm7894215/TokenTracker/releases/latest \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+          DMG_VERSION="${DMG_TAG#v}"
+
+          # Latest npm version for the CLI formula
+          NPM_VERSION=$(curl -sSL \
+            https://registry.npmjs.org/tokentracker-cli/latest \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+
+          echo "dmg_version=$DMG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "npm_version=$NPM_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Latest DMG: $DMG_VERSION"
+          echo "Latest npm: $NPM_VERSION"
+
+      - name: Bump Cask (DMG)
+        id: bump_cask
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.versions.outputs.dmg_version }}"
+
+          CURRENT=$(grep -E '^\s*version\s+"' Casks/tokentracker.rb | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ "$CURRENT" = "$VERSION" ]; then
+            echo "Cask already at $VERSION"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Download DMG and compute sha256
+          URL="https://github.com/mm7894215/TokenTracker/releases/download/v${VERSION}/TokenTrackerBar.dmg"
+          curl -sSL --fail -o /tmp/tt.dmg "$URL"
+          SHA=$(shasum -a 256 /tmp/tt.dmg | awk '{print $1}')
+          rm -f /tmp/tt.dmg
+
+          python3 - "$VERSION" "$SHA" <<'PY'
+          import re, sys, pathlib
+          version, sha = sys.argv[1], sys.argv[2]
+          p = pathlib.Path("Casks/tokentracker.rb")
+          txt = p.read_text()
+          txt = re.sub(r'(version\s+)"[^"]+"', rf'\1"{version}"', txt, count=1)
+          txt = re.sub(r'(sha256\s+)"[^"]+"', rf'\1"{sha}"', txt, count=1)
+          p.write_text(txt)
+          PY
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Bumped Cask to $VERSION ($SHA)"
+
+      - name: Bump Formula (npm CLI)
+        id: bump_formula
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.versions.outputs.npm_version }}"
+
+          CURRENT=$(grep -E '^\s*url\s+' Formula/tokentracker.rb | head -1 | sed -E 's/.*tokentracker-cli-([0-9.]+)\.tgz.*/\1/')
+          if [ "$CURRENT" = "$VERSION" ]; then
+            echo "Formula already at $VERSION"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          URL="https://registry.npmjs.org/tokentracker-cli/-/tokentracker-cli-${VERSION}.tgz"
+          curl -sSL --fail -o /tmp/tt.tgz "$URL"
+          SHA=$(shasum -a 256 /tmp/tt.tgz | awk '{print $1}')
+          rm -f /tmp/tt.tgz
+
+          python3 - "$VERSION" "$SHA" <<'PY'
+          import re, sys, pathlib
+          version, sha = sys.argv[1], sys.argv[2]
+          p = pathlib.Path("Formula/tokentracker.rb")
+          txt = p.read_text()
+          txt = re.sub(r'url\s+"[^"]+"', f'url "https://registry.npmjs.org/tokentracker-cli/-/tokentracker-cli-{version}.tgz"', txt, count=1)
+          txt = re.sub(r'(sha256\s+)"[^"]+"', rf'\1"{sha}"', txt, count=1)
+          p.write_text(txt)
+          PY
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Bumped Formula to $VERSION ($SHA)"
+
+      - name: Commit and push
+        if: steps.bump_cask.outputs.changed == 'true' || steps.bump_formula.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          MSG="chore: bump"
+          if [ "${{ steps.bump_cask.outputs.changed }}" = "true" ]; then
+            MSG="$MSG cask ${{ steps.versions.outputs.dmg_version }}"
+          fi
+          if [ "${{ steps.bump_formula.outputs.changed }}" = "true" ]; then
+            MSG="$MSG formula ${{ steps.versions.outputs.npm_version }}"
+          fi
+
+          git add Casks Formula
+          git commit -m "$MSG"
+          git push
