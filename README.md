@@ -4,38 +4,26 @@ Homebrew tap for [TokenTracker](https://github.com/mm7894215/TokenTracker) — a
 
 ## Install
 
-### macOS menu bar app (DMG)
-
 ```bash
+# macOS menu bar app (DMG)
 brew install --cask mm7894215/tokentracker/tokentracker
-```
 
-### CLI only
-
-```bash
+# CLI only
 brew install mm7894215/tokentracker/tokentracker
-```
-
-### Tap once, install by short name
-
-```bash
-brew tap mm7894215/tokentracker
-brew install --cask tokentracker      # menu bar app
-brew install tokentracker             # CLI
 ```
 
 ## Upgrade
 
 ```bash
-brew upgrade --cask tokentracker
-brew upgrade tokentracker
+brew upgrade --cask mm7894215/tokentracker/tokentracker
+brew upgrade mm7894215/tokentracker/tokentracker
 ```
 
 ## Uninstall
 
 ```bash
-brew uninstall --cask --zap tokentracker  # also removes app data and config
-brew uninstall tokentracker
+brew uninstall --cask --zap mm7894215/tokentracker/tokentracker
+brew uninstall mm7894215/tokentracker/tokentracker
 ```
 
 ## Automatic updates
