@@ -28,19 +28,32 @@ jobs:
 
       - name: Resolve latest versions
         id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # Latest GitHub release tag for the DMG
-          DMG_TAG=$(curl -sSL \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/mm7894215/TokenTracker/releases/latest \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
+          # Latest GitHub release tag for the DMG.
+          # Retry to tolerate /releases/latest index propagation lag after a
+          # repository_dispatch fires immediately on release publish.
+          DMG_TAG=""
+          for i in 1 2 3 4 5; do
+            TAG=$(gh api repos/mm7894215/TokenTracker/releases/latest --jq '.tag_name' 2>/dev/null || true)
+            if [ -n "$TAG" ] && [ "$TAG" != "null" ]; then
+              DMG_TAG="$TAG"
+              break
+            fi
+            echo "releases/latest not ready (attempt $i), retrying in 10s..." >&2
+            sleep 10
+          done
+          if [ -z "$DMG_TAG" ]; then
+            echo "failed to resolve TokenTracker latest release tag" >&2
+            exit 1
+          fi
           DMG_VERSION="${DMG_TAG#v}"
 
           # Latest npm version for the CLI formula
-          NPM_VERSION=$(curl -sSL \
+          NPM_VERSION=$(curl -sSL --fail --retry 5 --retry-delay 10 \
             https://registry.npmjs.org/tokentracker-cli/latest \
             | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
 
