@@ -75,9 +75,21 @@ jobs:
             exit 0
           fi
 
-          # Download DMG and compute sha256
+          # Download DMG and compute sha256. The main repo's release-dmg.yml
+          # creates the GitHub Release FIRST (a create-release job, so macOS + the
+          # Windows job can attach in parallel) and uploads TokenTrackerBar.dmg a
+          # couple minutes later. So a dispatch that arrives in between — e.g. from
+          # npm-publish.yml the instant npm publishes, or the hourly cron — sees
+          # releases/latest = vX.Y.Z but the DMG asset still 404s. Treat a missing
+          # DMG as "not ready yet" and skip the cask bump gracefully; the
+          # source:dmg dispatch (fired after the upload) or the next hourly cron
+          # finishes it. The Formula bump below still runs (npm is already live).
           URL="https://github.com/mm7894215/TokenTracker/releases/download/v${VERSION}/TokenTrackerBar.dmg"
-          curl -sSL --fail -o /tmp/tt.dmg "$URL"
+          if ! curl -sSL --fail -o /tmp/tt.dmg "$URL"; then
+            echo "DMG for v$VERSION not uploaded yet; skipping cask bump this run (will retry on next dispatch/cron)."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           SHA=$(shasum -a 256 /tmp/tt.dmg | awk '{print $1}')
           rm -f /tmp/tt.dmg
 
