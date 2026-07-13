@@ -20,6 +20,13 @@ on:
 permissions:
   contents: write
 
+# Serialize runs. A repository_dispatch (release publish) and the hourly cron
+# can fire within seconds of each other; both bump the same files and the
+# loser's push is rejected non-fast-forward. Queue instead of overlap.
+concurrency:
+  group: tap-auto-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -154,4 +161,28 @@ jobs:
 
           git add Casks Formula
           git commit -m "$MSG"
-          git push
+
+          # Belt-and-suspenders under the concurrency group: if some other
+          # writer still lands first, check whether the remote already carries
+          # this exact bump (then ours is redundant — succeed quietly),
+          # otherwise rebase and retry.
+          push_ok=false
+          for attempt in 1 2 3; do
+            if git push; then
+              push_ok=true
+              break
+            fi
+            git fetch origin main
+            if git diff --quiet HEAD origin/main -- Casks Formula; then
+              echo "Remote already contains this bump; nothing left to push."
+              git reset --hard origin/main
+              push_ok=true
+              break
+            fi
+            git pull --rebase origin main || { git rebase --abort; }
+            sleep 5
+          done
+          if [ "$push_ok" != "true" ]; then
+            echo "push failed after 3 attempts" >&2
+            exit 1
+          fi
