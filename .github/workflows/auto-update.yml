@@ -46,11 +46,16 @@ jobs:
           DMG_TAG=""
           for i in 1 2 3 4 5; do
             TAG=$(gh api repos/mm7894215/TokenTracker/releases/latest --jq '.tag_name' 2>/dev/null || true)
-            if [ -n "$TAG" ] && [ "$TAG" != "null" ]; then
-              DMG_TAG="$TAG"
-              break
-            fi
-            echo "releases/latest not ready (attempt $i), retrying in 10s..." >&2
+            # On API errors (e.g. a 503 outage) gh prints the JSON error body to
+            # stdout and `|| true` keeps it in TAG, so "non-empty" is not proof
+            # of a tag. Only accept something shaped like a real vX.Y.Z tag.
+            case "$TAG" in
+              v[0-9]*)
+                DMG_TAG="$TAG"
+                break
+                ;;
+            esac
+            echo "releases/latest not usable (attempt $i, got: ${TAG:-<empty>}), retrying in 10s..." >&2
             sleep 10
           done
           if [ -z "$DMG_TAG" ]; then
@@ -71,9 +76,13 @@ jobs:
 
       - name: Bump Cask (DMG)
         id: bump_cask
+        # Versions flow in via env, never inline ${{ }} inside `run:` — a value
+        # containing quotes (like the 503 JSON body above) would otherwise break
+        # the generated shell script itself (exit 127, "command not found").
+        env:
+          VERSION: ${{ steps.versions.outputs.dmg_version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.versions.outputs.dmg_version }}"
 
           CURRENT=$(grep -E '^\s*version\s+"' Casks/tokentracker.rb | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
           if [ "$CURRENT" = "$VERSION" ]; then
@@ -115,9 +124,10 @@ jobs:
 
       - name: Bump Formula (npm CLI)
         id: bump_formula
+        env:
+          VERSION: ${{ steps.versions.outputs.npm_version }}
         run: |
           set -euo pipefail
-          VERSION="${{ steps.versions.outputs.npm_version }}"
 
           CURRENT=$(grep -E '^\s*url\s+' Formula/tokentracker.rb | head -1 | sed -E 's/.*tokentracker-cli-([0-9.]+)\.tgz.*/\1/')
           if [ "$CURRENT" = "$VERSION" ]; then
@@ -146,6 +156,9 @@ jobs:
 
       - name: Commit and push
         if: steps.bump_cask.outputs.changed == 'true' || steps.bump_formula.outputs.changed == 'true'
+        env:
+          DMG_VERSION: ${{ steps.versions.outputs.dmg_version }}
+          NPM_VERSION: ${{ steps.versions.outputs.npm_version }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -153,10 +166,10 @@ jobs:
 
           MSG="chore: bump"
           if [ "${{ steps.bump_cask.outputs.changed }}" = "true" ]; then
-            MSG="$MSG cask ${{ steps.versions.outputs.dmg_version }}"
+            MSG="$MSG cask $DMG_VERSION"
           fi
           if [ "${{ steps.bump_formula.outputs.changed }}" = "true" ]; then
-            MSG="$MSG formula ${{ steps.versions.outputs.npm_version }}"
+            MSG="$MSG formula $NPM_VERSION"
           fi
 
           git add Casks Formula
