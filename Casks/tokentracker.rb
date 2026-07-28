@@ -14,13 +14,13 @@ cask "tokentracker" do
 
   depends_on macos: :monterey
 
-  app "TokenTrackerBar.app"
+  app "TokenTracker.app"
 
   zap trash: [
+    "~/.tokentracker",
     "~/Library/Application Support/TokenTrackerBar",
     "~/Library/Caches/me.rynn.TokenTrackerBar",
     "~/Library/Preferences/me.rynn.TokenTrackerBar.plist",
     "~/Library/Saved Application State/me.rynn.TokenTrackerBar.savedState",
-    "~/.tokentracker",
   ]
 end
