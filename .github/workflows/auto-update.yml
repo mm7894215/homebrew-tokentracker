@@ -45,7 +45,7 @@ jobs:
           # repository_dispatch fires immediately on release publish.
           DMG_TAG=""
           for i in 1 2 3 4 5; do
-            TAG=$(gh api repos/mm7894215/TokenTracker/releases/latest --jq '.tag_name' 2>/dev/null || true)
+            TAG=$(gh api repos/xiufengsun/TokenTracker/releases/latest --jq '.tag_name' 2>/dev/null || true)
             # On API errors (e.g. a 503 outage) gh prints the JSON error body to
             # stdout and `|| true` keeps it in TAG, so "non-empty" is not proof
             # of a tag. Only accept something shaped like a real vX.Y.Z tag.
@@ -100,7 +100,7 @@ jobs:
           # DMG as "not ready yet" and skip the cask bump gracefully; the
           # source:dmg dispatch (fired after the upload) or the next hourly cron
           # finishes it. The Formula bump below still runs (npm is already live).
-          URL="https://github.com/mm7894215/TokenTracker/releases/download/v${VERSION}/TokenTrackerBar.dmg"
+          URL="https://github.com/xiufengsun/TokenTracker/releases/download/v${VERSION}/TokenTrackerBar.dmg"
           if ! curl -sSL --fail -o /tmp/tt.dmg "$URL"; then
             echo "DMG for v$VERSION not uploaded yet; skipping cask bump this run (will retry on next dispatch/cron)."
             echo "changed=false" >> "$GITHUB_OUTPUT"

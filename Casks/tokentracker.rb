@@ -2,10 +2,10 @@ cask "tokentracker" do
   version "0.87.7"
   sha256 "303e0295b0e5b05f9767652401e18b0e83d30c17cbcae0eb00cd46f8313b5afe"
 
-  url "https://github.com/mm7894215/TokenTracker/releases/download/v#{version}/TokenTrackerBar.dmg"
+  url "https://github.com/xiufengsun/TokenTracker/releases/download/v#{version}/TokenTrackerBar.dmg"
   name "TokenTracker"
   desc "Local-first AI token usage tracker menu bar app"
-  homepage "https://github.com/mm7894215/TokenTracker"
+  homepage "https://github.com/xiufengsun/TokenTracker"
 
   livecheck do
     url :url
@@ -14,7 +14,7 @@ cask "tokentracker" do
 
   depends_on macos: :monterey
 
-  app "TokenTrackerBar.app"
+  app "TokenTracker.app"
 
   zap trash: [
     "~/Library/Application Support/TokenTrackerBar",

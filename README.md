@@ -1,6 +1,6 @@
 # homebrew-tokentracker
 
-Homebrew tap for [TokenTracker](https://github.com/mm7894215/TokenTracker) — a local-first AI token usage tracker for Claude Code, Codex, Cursor, Gemini, and other AI CLIs.
+Homebrew tap for [TokenTracker](https://github.com/xiufengsun/TokenTracker) — a local-first AI token usage tracker for Claude Code, Codex, Cursor, Gemini, and other AI CLIs.
 
 ## Install
 
@@ -31,7 +31,7 @@ brew uninstall mm7894215/tokentracker/tokentracker
 This tap is updated automatically by [`.github/workflows/auto-update.yml`](.github/workflows/auto-update.yml):
 
 - Polls GitHub Releases and npm registry **hourly** for new versions
-- Can also be triggered instantly via `repository_dispatch` from the main [TokenTracker](https://github.com/mm7894215/TokenTracker) repo's release workflows
+- Can also be triggered instantly via `repository_dispatch` from the main [TokenTracker](https://github.com/xiufengsun/TokenTracker) repo's release workflows
 - Bumps `version` + `sha256` in `Casks/tokentracker.rb` and `Formula/tokentracker.rb` automatically
 
 No manual PR required on every release.
